@@ -161,6 +161,76 @@
       pointer-events: none;
     }
 
+    /* TỐI ƯU HIỆU NĂNG MÁT LẠNH CHO THIẾT BỊ DI ĐỘNG (TIẾT KIỆM PIN & GPU) */
+    @media (hover: none), (max-width: 768px) {
+      #cursorSpotlight, .aurora-container {
+        display: none !important;
+      }
+      .cyber-grid-bg {
+        background-size: 24px 24px;
+      }
+      /* Giảm tải tính toán blur cường độ cao gây nóng máy trên smartphone */
+      .chart-container-glass,
+      .right-edge-dock,
+      header {
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+      }
+      /* Thu nhỏ dock điều khiển sát cạnh để không che khuất sơ đồ */
+      .right-edge-dock {
+        right: 4px !important;
+        padding: 6px 3px !important;
+        gap: 6px !important;
+        border-radius: 24px !important;
+        transform: translateY(-50%) scale(0.82) !important;
+        transform-origin: right center !important;
+      }
+      .dock-btn {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 13px !important;
+      }
+    }
+
+    /* ĐÁP ỨNG HIỂN THỊ CO GIÃN CHUẨN MỰC TRÊN MỌI KÍCH THƯỚC MÀN HÌNH */
+    @media (max-width: 640px) {
+      #chartWrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .chart-container-glass {
+        padding: 10px 5px !important;
+        border-radius: 16px !important;
+      }
+      .seat-avatar-circle {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        border-width: 1.5px !important;
+      }
+      .desk-card {
+        padding: 1px 2px 3px !important;
+        border-radius: 12px !important;
+      }
+      .seat-name {
+        font-size: 8.5px !important;
+        margin-top: 1px !important;
+        margin-bottom: 0px !important;
+        line-height: 1.2 !important;
+      }
+      .group-text-direct {
+        font-size: 8px !important;
+        top: 1px !important;
+      }
+    }
+    @media (min-width: 641px) and (max-width: 900px) {
+      .seat-avatar-circle {
+        width: 62px !important;
+        height: 62px !important;
+      }
+    }
+
     #cursorSpotlight {
       position: fixed;
       top: 0; left: 0;
@@ -922,21 +992,22 @@
     </div>
   </main>
 
-  <!-- DEVELOPER FOOTER WATERMARK -->
-  <div class="no-print fixed bottom-2.5 right-4 z-20 pointer-events-auto">
-    <div class="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-panel)] backdrop-blur-md border border-[var(--border-panel)] rounded-full shadow-lg text-[var(--text-sub)] text-xs font-semibold select-none">
-      <i class="fa-solid fa-microchip text-indigo-400 text-[11px]"></i>
-      <span>Developed by <strong class="text-indigo-400 font-bold">Viễn Thông Quy Nhơn</strong></span>
-    </div>
-  </div>
-
-  <!-- POPUP XEM TRƯỚC ẢNH ĐẠI DIỆN HÌNH TRÒN HOÀN TOÀN -->
+  <!-- POPUP XEM TRƯỚC ẢNH ĐẠI DIỆN HÌNH TRÒN (CHỈ HIỆN KHI RÊ CHUỘT VÀO AVATAR) -->
   <div id="avatarHoverPreview">
     <div class="avatar-preview-circle-wrap">
       <img id="hoverAvatarImg" src="" alt="Ảnh học sinh">
     </div>
     <div id="hoverStudentName" class="font-black text-[var(--text-main)] text-sm truncate mt-2">Tên học sinh</div>
     <div id="hoverStudentPos" class="text-[11px] font-mono font-semibold text-indigo-400 mt-0.5">Vị trí bàn</div>
+  </div>
+
+  <!-- DEVELOPER FOOTER WATERMARK (SIÊU TINH TẾ & TỰ ĐỘNG THU GỌN TRÊN DI ĐỘNG) -->
+  <div class="no-print fixed bottom-2 right-2 sm:bottom-2.5 sm:right-4 z-20 pointer-events-auto">
+    <div id="devWatermarkBadge" onclick="toggleDevBadge()" class="group flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-[var(--bg-panel)]/85 hover:bg-[var(--bg-panel)] active:scale-95 backdrop-blur-md border border-[var(--border-panel)] rounded-full shadow-lg text-[var(--text-sub)] text-[10px] sm:text-xs font-semibold select-none transition-all cursor-pointer">
+      <i class="fa-solid fa-microchip text-indigo-400 text-[10.5px] sm:text-[11px] shrink-0"></i>
+      <span class="hidden sm:inline">Developed by <strong class="text-indigo-400 font-bold">Viễn Thông Quy Nhơn</strong></span>
+      <span id="devMobileLabel" class="sm:hidden text-indigo-400 font-bold font-mono text-[9px] tracking-tight">VT Quy Nhơn</span>
+    </div>
   </div>
 
   <div id="editSeatModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden no-print">
@@ -1208,13 +1279,26 @@
       // Đã tắt bỏ toàn bộ hiển thị dòng thông báo trạng thái
     }
 
-    // Hiệu ứng di chuyển vệt sáng Spotlight theo con trỏ chuột
+    // Hiệu ứng di chuyển vệt sáng Spotlight (chỉ kích hoạt trên thiết bị có chuột để máy mát lạnh)
     const spotlight = document.getElementById('cursorSpotlight');
-    window.addEventListener('mousemove', (e) => {
-      if (spotlight) {
-        spotlight.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      window.addEventListener('mousemove', (e) => {
+        if (spotlight) {
+          spotlight.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        }
+      }, { passive: true });
+    }
+
+    // Tự động đóng mở huy hiệu Watermark khi chạm trên di động
+    function toggleDevBadge() {
+      const label = document.getElementById('devMobileLabel');
+      if (!label) return;
+      if (label.innerText === 'VT Quy Nhơn') {
+        label.innerText = 'Viễn Thông Quy Nhơn';
+      } else {
+        label.innerText = 'VT Quy Nhơn';
       }
-    });
+    }
 
     function cycleTheme() {
       currentThemeIndex = (currentThemeIndex + 1) % THEME_STATES.length;
