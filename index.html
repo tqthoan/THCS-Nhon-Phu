@@ -787,8 +787,11 @@
       
       <div class="flex items-center gap-2 shrink-0 pr-2 border-r border-[var(--border-panel)]">
         <div class="flex flex-col">
-          <span class="text-xs font-black tracking-wider uppercase text-[var(--text-main)] font-mono">NEURO-MATRIX</span>
-          <span class="text-[9.5px] font-semibold text-[var(--text-muted)]">Sơ đồ chỗ ngồi thông minh</span>
+          <span class="text-xs font-black tracking-wider uppercase text-[var(--text-main)] font-mono">SƠ ĐỒ LỚP HỌC</span>
+          <button id="cloudSyncStatusBadge" onclick="openCloudInfoModal()" class="inline-flex items-center gap-1.5 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold font-mono tracking-tight cursor-pointer transition border border-rose-500/60 bg-rose-500/20 text-rose-300" title="Trạng thái kết nối Cloud">
+            <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-rose-400"></span>
+            <span id="cloudSyncText">Chưa kết nối Cloud</span>
+          </button>
         </div>
       </div>
 
@@ -1172,6 +1175,46 @@
     </div>
   </div>
 
+  <!-- MODAL THÔNG TIN KẾT NỐI CLOUD -->
+  <div id="cloudInfoModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[80] hidden no-print">
+    <div class="bg-[var(--bg-panel-solid)] rounded-2xl max-w-sm w-full mx-4 p-5 shadow-2xl border border-[var(--border-panel)] text-[var(--text-main)] relative">
+      <div class="flex items-center justify-between pb-3 border-b border-[var(--border-panel)]">
+        <h3 class="text-sm font-black flex items-center gap-2">
+          <i class="fa-solid fa-cloud text-indigo-400"></i> Trạng thái kết nối Cloud
+        </h3>
+        <button onclick="closeCloudInfoModal()" class="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 text-[var(--text-sub)] flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <div class="py-4 space-y-3 text-xs">
+        <div class="p-3 bg-[var(--bg-box)] border border-[var(--border-panel)] rounded-xl space-y-1">
+          <div class="flex items-center justify-between font-bold">
+            <span class="text-[var(--text-sub)]">Trạng thái:</span>
+            <span id="modalCloudStateText" class="text-emerald-400 font-mono">Đang kiểm tra...</span>
+          </div>
+          <p id="modalCloudSubText" class="text-[11px] text-[var(--text-muted)] mt-1">Đang kiểm tra kết nối với máy chủ Firebase.</p>
+        </div>
+
+        <div class="text-[11.5px] text-[var(--text-sub)] space-y-1.5 leading-relaxed">
+          <p class="font-bold text-[var(--text-main)]">📌 Lưu ý cấu hình Firebase Console:</p>
+          <p>1. <strong>Authentication</strong> &gt; Sign-in method &gt; Bật <strong>Anonymous</strong>.</p>
+          <p>2. <strong>Firestore Database</strong> &gt; Rules &gt; Cấu hình quyền đọc/ghi:</p>
+          <pre class="bg-black/50 p-2 rounded-lg font-mono text-[10.5px] text-indigo-300 overflow-x-auto">allow read, write: if true;</pre>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-[var(--border-panel)] flex justify-end gap-2">
+        <button onclick="retryCloudConnection()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md">
+          <i class="fa-solid fa-rotate text-[10px]"></i> Thử kết nối lại
+        </button>
+        <button onclick="closeCloudInfoModal()" class="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-[var(--text-sub)] rounded-xl font-bold text-xs">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -1198,26 +1241,47 @@
 
     let currentUser = null;
     let isCloudReady = false;
+    let cloudLastError = null;
 
-    function updateSyncBadge(status, text) {
+    function updateSyncBadge(status, text, detail = '') {
       const badge = document.getElementById('cloudSyncStatusBadge');
       const dot = document.getElementById('cloudSyncDot');
       const txt = document.getElementById('cloudSyncText');
+      const modalState = document.getElementById('modalCloudStateText');
+      const modalSub = document.getElementById('modalCloudSubText');
+
+      if (modalState) modalState.innerText = text;
+      if (modalSub && detail) modalSub.innerText = detail;
+
       if (!badge || !dot || !txt) return;
 
       if (status === 'synced') {
-        badge.className = "flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-[10.5px] font-bold font-mono tracking-tight select-none";
-        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]";
-        txt.innerText = text || "Đồng bộ";
+        badge.className = "inline-flex items-center gap-1.5 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold font-mono tracking-tight cursor-pointer transition border border-emerald-500/60 bg-emerald-500/20 text-emerald-300 shadow-[0_0_15px_rgba(52,211,153,0.4)]";
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
+        txt.innerText = text || "Đã kết nối Cloud";
       } else if (status === 'syncing') {
-        badge.className = "flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-[10.5px] font-bold font-mono tracking-tight select-none";
+        badge.className = "inline-flex items-center gap-1.5 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold font-mono tracking-tight cursor-pointer transition border border-amber-500/60 bg-amber-500/20 text-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]";
         dot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
-        txt.innerText = text || "Đang lưu...";
-      } else if (status === 'offline') {
-        badge.className = "flex items-center gap-1 px-2.5 py-1 bg-slate-500/10 text-slate-400 border border-slate-500/30 rounded-xl text-[10.5px] font-bold font-mono tracking-tight select-none";
-        dot.className = "w-2 h-2 rounded-full bg-slate-400";
-        txt.innerText = text || "Ngoại tuyến";
+        txt.innerText = text || "Đang lưu Cloud...";
+      } else if (status === 'error' || status === 'offline') {
+        badge.className = "inline-flex items-center gap-1.5 px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold font-mono tracking-tight cursor-pointer transition border border-rose-500/60 bg-rose-500/20 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.4)]";
+        dot.className = "w-2 h-2 rounded-full bg-rose-400";
+        txt.innerText = text || "Chưa kết nối Cloud";
       }
+    }
+
+    function openCloudInfoModal() {
+      const modal = document.getElementById('cloudInfoModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeCloudInfoModal() {
+      const modal = document.getElementById('cloudInfoModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function retryCloudConnection() {
+      initCloudSync();
     }
 
     const INITIAL_STUDENT_NAMES_7A1 = [
@@ -1409,11 +1473,11 @@
 
     /* LƯU TRỮ VÀ ĐỒNG BỘ ĐÁM MÂY HAI CHIỀU */
     async function syncClassToCloud(classId) {
-      if (!currentUser || !isCloudReady) return;
+      if (!isCloudReady) return;
       const profile = classProfiles[classId];
       if (!profile) return;
 
-      updateSyncBadge('syncing', 'Đang lưu...');
+      updateSyncBadge('syncing', 'Đang lưu Cloud...');
       try {
         const classDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'classes', classId);
         await setDoc(classDocRef, {
@@ -1425,10 +1489,11 @@
           grid: JSON.stringify(profile.grid),
           updatedAt: Date.now()
         }, { merge: true });
-        updateSyncBadge('synced', 'Đã lưu');
+        updateSyncBadge('synced', 'Đã kết nối Cloud', 'Đồng bộ dữ liệu thời gian thực thành công');
       } catch (err) {
         console.error("Lỗi khi đẩy lên đám mây:", err);
-        updateSyncBadge('offline', 'Ngoại tuyến');
+        cloudLastError = err.message || 'Lỗi quyền truy cập Firestore';
+        updateSyncBadge('error', 'Chưa kết nối Cloud', cloudLastError);
       }
     }
 
@@ -2320,7 +2385,9 @@
       if (inputYear) inputYear.value = prof.year || "2026 - 2027";
       if (select) select.value = classId;
 
-      saveProfilesToStorage();
+      if (!isSilent) {
+        saveProfilesToStorage();
+      }
       renderFrontAndPodium();
       renderClassroom();
     }
@@ -2524,6 +2591,9 @@
       saveCurrentClassProfile,
       openClassManagerModal,
       closeClassManagerModal,
+      openCloudInfoModal,
+      closeCloudInfoModal,
+      retryCloudConnection,
       setPerspective,
       handleStudentSearch,
       exportCurrentImage,
@@ -2556,15 +2626,20 @@
     async function initCloudSync() {
       try {
         updateSyncBadge('syncing', 'Đang kết nối...');
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          const cred = await signInWithCustomToken(auth, __initial_auth_token);
-          currentUser = cred.user;
-        } else {
-          const cred = await signInAnonymously(auth);
-          currentUser = cred.user;
+        
+        try {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            const cred = await signInWithCustomToken(auth, __initial_auth_token);
+            currentUser = cred.user;
+          } else {
+            const cred = await signInAnonymously(auth);
+            currentUser = cred.user;
+          }
+        } catch (authError) {
+          console.warn("Chưa bật Anonymous Auth trên Firebase Console:", authError);
+          // Vẫn cho phép thử tiếp kết nối Firestore nếu Rules cho phép read/write
         }
 
-        if (!currentUser) return;
         isCloudReady = true;
 
         const classesCol = collection(db, 'artifacts', appId, 'public', 'data', 'classes');
@@ -2595,18 +2670,19 @@
               switchClassProfile(activeClassId, true);
             }
           } else {
-            // Khởi tạo lớp 7A1 mặc định lên đám mây
             syncClassToCloud(activeClassId);
           }
-          updateSyncBadge('synced', 'Đồng bộ');
+          updateSyncBadge('synced', 'Đã kết nối Cloud', 'Đồng bộ thời gian thực 2 chiều thành công');
         }, (err) => {
           console.error("Lỗi snapshot đám mây:", err);
-          updateSyncBadge('offline', 'Ngoại tuyến');
+          cloudLastError = err.message || 'Lỗi quyền truy cập (Permission Denied)';
+          updateSyncBadge('error', 'Chưa kết nối Cloud', cloudLastError);
         });
 
       } catch (err) {
         console.error("Lỗi xác thực đám mây:", err);
-        updateSyncBadge('offline', 'Ngoại tuyến');
+        cloudLastError = err.message || 'Không thể kết nối máy chủ';
+        updateSyncBadge('error', 'Chưa kết nối Cloud', cloudLastError);
       }
     }
 
